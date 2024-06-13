@@ -1,3 +1,4 @@
+use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy::{prelude::*, render::mesh::Indices};
 
@@ -40,7 +41,8 @@ pub(crate) fn text_mesh(
     // TODO: performance - split to mesh-update and mesh-create systems?
 
     for text_mesh in text_meshes.iter_mut() {
-        let (entity, transform, global_transform, material, text_mesh, mesh, mut state) = text_mesh;
+        let (entity, transform, global_transform, material, text_mesh, mesh, mut state) =
+            text_mesh;
 
         let font = match fonts.get_mut(&text_mesh.style.font) {
             Some(font) => font,
@@ -64,10 +66,19 @@ pub(crate) fn text_mesh(
                 let mesh = meshes.get_mut(mesh).unwrap();
                 apply_mesh(ttf2_mesh, mesh);
 
-                // TODO: handle color updates
+                if let Some(material) = material {
+                    if let Some(material) = materials.get_mut(material) {
+                        if material.base_color != text_mesh.style.color {
+                            material.base_color = text_mesh.style.color;
+                        }
+                    }
+                }
             }
             None => {
-                let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+                let mut mesh = Mesh::new(
+                    PrimitiveTopology::TriangleList,
+                    RenderAssetUsages::default(),
+                );
 
                 apply_mesh(ttf2_mesh, &mut mesh);
 
@@ -76,6 +87,7 @@ pub(crate) fn text_mesh(
                     material: material.map(|m| m.clone()).unwrap_or_else(|| {
                         materials.add(StandardMaterial {
                             base_color: text_mesh.style.color,
+                            alpha_mode: AlphaMode::Blend,
                             ..Default::default()
                         })
                     }),
@@ -141,5 +153,5 @@ fn apply_mesh(mesh_data: MeshData, mesh: &mut Mesh) {
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, mesh_data.vertices);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, mesh_data.normals);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, mesh_data.uvs);
-    mesh.set_indices(Some(Indices::U32(mesh_data.indices)));
+    mesh.insert_indices(Indices::U32(mesh_data.indices));
 }
